@@ -20,11 +20,10 @@ export async function POST(req: NextRequest) {
   const lines = csvText.split('\n').filter(Boolean)
   const header = lines[0] || ''
 
-  const requiredFields = ['数据年月', '商品名称', '美元']
-  const hasRequired = requiredFields.every((f: string) => header.includes(f))
-  if (!hasRequired) {
+  // 只检测最核心的字段，宽松匹配
+  if (!header.includes('数据年月') || !header.includes('美元')) {
     return NextResponse.json({
-      error: '文件缺少必要字段，请确认包含：数据年月、商品名称、商品编码、贸易伙伴名称、注册地名称、美元'
+      error: '文件格式不符，请确认是海关出口CSV数据（需含数据年月、美元等字段）'
     }, { status: 400 })
   }
 
@@ -33,20 +32,22 @@ export async function POST(req: NextRequest) {
   const values = dataLine.split(',').map((v: string) => v.trim().replace(/"/g, ''))
 
   const getVal = (field: string) => {
-    const idx = headers.indexOf(field)
+    const idx = headers.findIndex((h: string) => h.includes(field))
     return idx >= 0 ? values[idx] : ''
   }
 
-  const productName = getVal('商品名称') || filename.replace('.csv', '')
-  const hsCode = getVal('商品编码') || ''
+  const productName = getVal('商品名称') || getVal('商品') || filename.replace('.csv', '')
+  const hsCode = getVal('商品编码') || getVal('编码') || ''
 
   const monthSet = new Set<string>()
-  lines.slice(1).forEach((line: string) => {
-    const cols = line.split(',')
-    const idx = headers.indexOf('数据年月')
-    if (idx >= 0 && cols[idx]) monthSet.add(cols[idx].trim().replace(/"/g, ''))
-  })
-  const months = [...monthSet].sort()
+  const monthIdx = headers.findIndex((h: string) => h.includes('数据年月'))
+  if (monthIdx >= 0) {
+    lines.slice(1).forEach((line: string) => {
+      const cols = line.split(',')
+      if (cols[monthIdx]) monthSet.add(cols[monthIdx].trim().replace(/"/g, ''))
+    })
+  }
+  const months = Array.from(monthSet).sort()
   const periodDesc = months.length > 1
     ? `${months[0]} ~ ${months[months.length - 1]}（${months.length}个月）`
     : months[0] || '未知周期'
