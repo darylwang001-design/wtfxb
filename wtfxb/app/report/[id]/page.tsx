@@ -581,11 +581,11 @@ function buildPriceAnalysis(scope){
 }
 
 function buildReport(rows, fn){
-  rows=rows.filter(r=>r['数据年月']&&r['美元']);
-  rows.forEach(r=>{try{r._usd=parseFloat(((r['美元']||r['金额']||'')+'').replace(/,/g,''))||0;r._qty=parseInt(((r['第一数量']||r['数量']||'')+'').replace(/,/g,''))||0;r._ym=parseInt((r['数据年月']||'')+''.replace(/\D/g,''))||0;}catch(e){r._usd=0;r._qty=0;r._ym=0;}});
+  rows=rows.filter(r=>r&&r['数据年月']);
+  rows.forEach(r=>{try{const usdStr=((r['美元']||r['金额']||r['出口金额']||'')+'');const qtyStr=((r['第一数量']||r['数量']||'')+'');const ymStr=((r['数据年月']||'')+'');r._usd=parseFloat(usdStr.replace(/,/g,''))||0;r._qty=parseInt(qtyStr.replace(/,/g,''))||0;r._ym=parseInt(ymStr.replace(/\D/g,'').slice(0,6))||0;}catch(e){r._usd=0;r._qty=0;r._ym=0;}});
   const months=[...new Set(rows.map(r=>r._ym))].filter(Boolean).sort();
-  const allCodes=[...new Set(rows.map(r=>(r['商品编码']||'').toString().trim()).filter(Boolean))];
-  const allNames=[...new Set(rows.map(r=>(r['商品名称']||'').toString().trim()).filter(Boolean))];
+  const allCodes=[...new Set(rows.map(r=>((r['商品编码']||'')+'').trim()).filter(Boolean))];
+  const allNames=[...new Set(rows.map(r=>((r['商品名称']||'')+'').trim()).filter(Boolean))];
   const hsCode=allCodes.length===1?allCodes[0]:allCodes.length>1?allCodes.map(c=>'HS'+c).join('+'):'';
   const productName=allNames.length===1?allNames[0]:allNames.length>1?\`多品类合并（\${allCodes.map(c=>'HS'+c).join('+')}）\`:'未知商品';
   const isMultiProduct=allCodes.length>1;
