@@ -34,13 +34,20 @@ export default function ReportPage() {
     setReport(rep)
     setCredits(cred?.credits ?? 0)
 
-    // 从 Storage 取 CSV
-    const { data: blob } = await sb.storage
-      .from('report-data')
-      .download(`${userId}/${id}.csv`)
-    if (blob) {
-      const text = await blob.text()
-      setCsvText(text)
+    // 优先从 sessionStorage 读（新上传时瞬间可用）
+    const cached = sessionStorage.getItem(`csv_${id}`)
+    if (cached) {
+      setCsvText(cached)
+    } else {
+      // 历史报告重新打开：从 Storage 下载
+      const { data: blob } = await sb.storage
+        .from('report-data')
+        .download(`${userId}/${id}.csv`)
+      if (blob) {
+        const text = await blob.text()
+        setCsvText(text)
+        sessionStorage.setItem(`csv_${id}`, text)
+      }
     }
     setLoading(false)
   }
