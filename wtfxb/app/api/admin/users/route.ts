@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { createSupabaseAdmin } from '@/lib/supabase'
 
-export async function GET(req: NextRequest) {
+export async function GET() {
   const admin = createSupabaseAdmin()
 
   const { data: profiles } = await admin
@@ -10,24 +10,30 @@ export async function GET(req: NextRequest) {
     .order('created_at', { ascending: false })
     .limit(500)
 
-  const { data: reportCounts } = await admin
-    .from('reports')
-    .select('user_id')
+  const { data: reportCounts } = await admin.from('reports').select('user_id')
 
   const countMap: Record<string, number> = {}
-  const rcList = (reportCounts || []) as { user_id: string }[]
-  rcList.forEach(r => {
-    countMap[r.user_id] = (countMap[r.user_id] || 0) + 1
-  })
+  for (const r of (reportCounts || [])) {
+    const row = r as { user_id: string }
+    countMap[row.user_id] = (countMap[row.user_id] || 0) + 1
+  }
 
   const { data: authUsers } = await admin.auth.admin.listUsers({ perPage: 500 })
   const emailMap: Record<string, string> = {}
-  const auList = (authUsers?.users || []) as { id: string; email?: string }[]
-  auList.forEach(u => {
+  for (const u of (authUsers?.users || [])) {
     emailMap[u.id] = u.email || ''
-  })
+  }
 
   const users = (profiles || []).map((p: any) => ({
     id: p.id,
     email: emailMap[p.id] || '',
-    displa
+    display_name: p.display_name,
+    created_at: p.created_at,
+    credits: p.user_credits?.[0]?.credits ?? 0,
+    total_recharged: p.user_credits?.[0]?.total_recharged ?? 0,
+    total_spent: p.user_credits?.[0]?.total_spent ?? 0,
+    report_count: countMap[p.id] || 0,
+  }))
+
+  return NextResponse.json({ users })
+}
