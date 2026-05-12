@@ -69,6 +69,8 @@ export default function DashboardPage() {
       setUploading(false)
       return
     }
+    // 存入sessionStorage，报告页直接读取，无需再下载
+    sessionStorage.setItem(`csv_${json.reportId}`, text)
     router.push(`/report/${json.reportId}`)
   }
 
