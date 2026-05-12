@@ -352,11 +352,21 @@ function buildWatermark(){
 }
 
 function parseCSV(text, fn){
-  Papa.parse(text,{header:true,skipEmptyLines:true,
-    complete:res=>{try{buildReport(res.data,fn);}catch(err){
-      document.getElementById('reportBody').innerHTML='<div style="padding:40px;color:#c0392b">数据解析失败：'+err.message+'</div>';
-      console.error(err);
-    }},
+  Papa.parse(text,{header:true,skipEmptyLines:true,transformHeader:function(h){return h.trim().replace(/^\uFEFF/,'').replace(/\r/,'');},
+    complete:res=>{
+      try{
+        // 字段名标准化：把所有key去掉空格和特殊字符
+        const cleaned=res.data.map(row=>{
+          const nr={};
+          Object.keys(row).forEach(k=>{nr[k.trim().replace(/^\uFEFF/,'')]=row[k];});
+          return nr;
+        });
+        buildReport(cleaned,fn);
+      }catch(err){
+        document.getElementById('reportBody').innerHTML='<div style="padding:40px;color:#c0392b">数据解析失败：'+err.message+'<br><small>'+err.stack+'</small></div>';
+        console.error(err);
+      }
+    },
     error:err=>{document.getElementById('reportBody').innerHTML='<div style="padding:40px;color:#c0392b">CSV解析错误：'+err.message+'</div>';}
   });
 }
