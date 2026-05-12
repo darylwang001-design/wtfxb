@@ -17,30 +17,30 @@ export async function POST(req: NextRequest) {
   const { filename, csvText } = await req.json()
   if (!csvText) return NextResponse.json({ error: '数据为空' }, { status: 400 })
 
-  const lines = csvText.split('\n').filter(Boolean)
-  const header = lines[0] || ''
-
-  // 只检测最核心的字段，宽松匹配
-  if (!header.includes('数据年月') || !header.includes('美元')) {
-    return NextResponse.json({
-      error: '文件格式不符，请确认是海关出口CSV数据（需含数据年月、美元等字段）'
-    }, { status: 400 })
+  // 处理BOM头和编码问题
+  const cleanText = csvText.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+  const lines = cleanText.split('\n').filter((l: string) => l.trim())
+  
+  if (lines.length < 2) {
+    return NextResponse.json({ error: '文件内容为空或格式错误' }, { status: 400 })
   }
 
+  // 不做字段验证，直接解析
+  const header = lines[0]
   const dataLine = lines[1] || ''
-  const headers = header.split(',').map((h: string) => h.trim().replace(/"/g, ''))
+  const headers = header.split(',').map((h: string) => h.trim().replace(/"/g, '').replace(/^\uFEFF/, ''))
   const values = dataLine.split(',').map((v: string) => v.trim().replace(/"/g, ''))
 
-  const getVal = (field: string) => {
-    const idx = headers.findIndex((h: string) => h.includes(field))
+  const getVal = (keywords: string[]) => {
+    const idx = headers.findIndex((h: string) => keywords.some(k => h.includes(k)))
     return idx >= 0 ? values[idx] : ''
   }
 
-  const productName = getVal('商品名称') || getVal('商品') || filename.replace('.csv', '')
-  const hsCode = getVal('商品编码') || getVal('编码') || ''
+  const productName = getVal(['商品名称', '品名', '商品']) || filename.replace('.csv', '')
+  const hsCode = getVal(['商品编码', 'HS', '编码']) || ''
 
+  const monthIdx = headers.findIndex((h: string) => h.includes('年月') || h.includes('月份') || h.includes('日期'))
   const monthSet = new Set<string>()
-  const monthIdx = headers.findIndex((h: string) => h.includes('数据年月'))
   if (monthIdx >= 0) {
     lines.slice(1).forEach((line: string) => {
       const cols = line.split(',')
@@ -67,9 +67,9 @@ export async function POST(req: NextRequest) {
 
   await admin.storage
     .from('report-data')
-    .upload(`${user.id}/${report.id}.csv`, csvText, {
+    .upload(`${user.id}/${report.id}.csv`, cleanText, {
       contentType: 'text/csv',
-      upsert: false,
+      upsert: true,
     })
 
   return NextResponse.json({ reportId: report.id })
