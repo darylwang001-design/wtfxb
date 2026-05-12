@@ -366,7 +366,7 @@ function groupBy(rows,field){const map={};rows.forEach(r=>{const k=r[field]||'�
 function fmtUSD(v){if(v>=1e8)return'$'+(v/1e8).toFixed(2)+'亿';if(v>=1e4)return'$'+(v/1e4).toFixed(2)+'万';return'$'+v.toFixed(0);}
 function fmtQTY(v,u){if(v>=1e8)return(v/1e8).toFixed(2)+'亿'+u;if(v>=1e4)return(v/1e4).toFixed(2)+'万'+u;return v.toLocaleString()+u;}
 function fmtBar(v,isUSD,u){if(isUSD){if(v>=1e4)return'$'+(v/1e4).toFixed(1)+'万';return'$'+v.toFixed(0);}else{if(v>=1e4)return(v/1e4).toFixed(1)+'万'+u;return v.toFixed(0)+u;}}
-function fmtYM(ym){const s=ym.toString();return s.slice(0,4)+'-'+s.slice(4);}
+function fmtYM(ym){if(!ym)return'';const s=(ym+'');return s.length>=6?s.slice(0,4)+'-'+s.slice(4):s;}
 function pct(a,b){return b>0?((a-b)/b*100).toFixed(1)+'%':'—';}
 
 function detectPeriod(months){
@@ -581,7 +581,17 @@ function buildPriceAnalysis(scope){
 }
 
 function buildReport(rows, fn){
-  rows=rows.filter(r=>r&&r['数据年月']);
+  // 强过滤：去掉空行和缺少关键字段的行
+  rows=rows.filter(r=>{
+    if(!r||typeof r!=='object')return false;
+    const ym=(r['数据年月']||'')+'';
+    const usd=(r['美元']||r['金额']||'')+'';
+    return ym.trim()&&usd.trim();
+  });
+  if(!rows.length){
+    document.getElementById('reportBody').innerHTML='<div style="padding:40px;color:#c0392b">数据为空或格式不匹配，请确认CSV包含"数据年月"和"美元"字段</div>';
+    return;
+  }
   rows.forEach(r=>{try{const usdStr=((r['美元']||r['金额']||r['出口金额']||'')+'');const qtyStr=((r['第一数量']||r['数量']||'')+'');const ymStr=((r['数据年月']||'')+'');r._usd=parseFloat(usdStr.replace(/,/g,''))||0;r._qty=parseInt(qtyStr.replace(/,/g,''))||0;r._ym=parseInt(ymStr.replace(/\D/g,'').slice(0,6))||0;}catch(e){r._usd=0;r._qty=0;r._ym=0;}});
   const months=[...new Set(rows.map(r=>r._ym))].filter(Boolean).sort();
   const allCodes=[...new Set(rows.map(r=>((r['商品编码']||'')+'').trim()).filter(Boolean))];
