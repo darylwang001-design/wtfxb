@@ -582,7 +582,7 @@ function buildPriceAnalysis(scope){
 
 function buildReport(rows, fn){
   rows=rows.filter(r=>r['数据年月']&&r['美元']);
-  rows.forEach(r=>{r._usd=parseFloat((r['美元']||'').toString().replace(/,/g,''))||0;r._qty=parseInt((r['第一数量']||'').toString().replace(/,/g,''))||0;r._ym=parseInt(r['数据年月'])||0;});
+  rows.forEach(r=>{try{r._usd=parseFloat(((r['美元']||r['金额']||'')+'').replace(/,/g,''))||0;r._qty=parseInt(((r['第一数量']||r['数量']||'')+'').replace(/,/g,''))||0;r._ym=parseInt((r['数据年月']||'')+''.replace(/\D/g,''))||0;}catch(e){r._usd=0;r._qty=0;r._ym=0;}});
   const months=[...new Set(rows.map(r=>r._ym))].filter(Boolean).sort();
   const allCodes=[...new Set(rows.map(r=>(r['商品编码']||'').toString().trim()).filter(Boolean))];
   const allNames=[...new Set(rows.map(r=>(r['商品名称']||'').toString().trim()).filter(Boolean))];
