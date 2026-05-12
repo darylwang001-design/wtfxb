@@ -10,7 +10,7 @@ export async function POST(req: NextRequest) {
   const sb = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { cookies: { get: (n) => cookieStore.get(n)?.value } }
+    { cookies: { get: (n: string) => cookieStore.get(n)?.value } }
   )
 
   const { data: { user } } = await sb.auth.getUser()
@@ -21,16 +21,14 @@ export async function POST(req: NextRequest) {
 
   const admin = createSupabaseAdmin()
 
-  // 验证报告归属
   const { data: report } = await admin
     .from('reports').select('*').eq('id', reportId).eq('user_id', user.id).single()
 
   if (!report) return NextResponse.json({ error: '报告不存在' }, { status: 404 })
   if (report.status === 'unlocked') return NextResponse.json({ ok: true, alreadyUnlocked: true })
 
-  // 检查点数
   const { data: creditRow } = await admin
-    .from('user_credits').select('credits').eq('user_id', user.id).single()
+    .from('user_credits').select('credits, total_spent').eq('user_id', user.id).single()
 
   const currentCredits = creditRow?.credits ?? 0
   if (currentCredits < UNLOCK_COST) {
@@ -39,11 +37,10 @@ export async function POST(req: NextRequest) {
 
   const newBalance = currentCredits - UNLOCK_COST
 
-  // 原子操作：扣点数 + 更新报告状态
-  const [, , transErr] = await Promise.all([
+  await Promise.all([
     admin.from('user_credits').update({
       credits: newBalance,
-      total_spent: (creditRow as any).total_spent + UNLOCK_COST,
+      total_spent: (creditRow?.total_spent ?? 0) + UNLOCK_COST,
       updated_at: new Date().toISOString(),
     }).eq('user_id', user.id),
 
@@ -62,8 +59,6 @@ export async function POST(req: NextRequest) {
       report_id: reportId,
     }),
   ])
-
-  if (transErr) console.error('Transaction log error:', transErr)
 
   return NextResponse.json({ ok: true, newBalance })
 }
